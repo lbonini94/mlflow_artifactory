@@ -16,18 +16,17 @@ class JfrogArtifactoryRepository(ArtifactRepository):
     is_plugin=True
     
     def __init__(self,
-                 artifact_uri: str, # "artifactory://mlflow",
+                 artifact_uri: str, # "artifactory://experiment_foo",
                  ):
-        
         super(JfrogArtifactoryRepository, self).__init__(artifact_uri)
         
-        logger.info('JFROG STARTED')
-        # "http://my-jfrog-server/artifactory/mlflow"
+        # "http://my-jfrog-server/artifactory/<main_repo>"
         self.jfrog_endpoint_url = os.environ.get("JFROG_ENDPOINT_URL")
         assert self.jfrog_endpoint_url, 'Please set JFROG_ENDPOINT_URL'
         
+        self.repo_name, self.repo_path = self.parse_artifactory_uri(artifact_uri)
         self.auth: dict = self._auth()
-        self.jfrog_artifactory_uri = artifact_uri
+        
         
     def _auth(self):
 
@@ -63,12 +62,12 @@ class JfrogArtifactoryRepository(ArtifactRepository):
             )
             if path.exists():
                 return {"auth": (jfrog_artifactory_username,
-                                    jfrog_artifactory_password)}
+                                 jfrog_artifactory_password)}
 
                 
     @staticmethod
     def parse_artifactory_uri(uri:str):
-        """Parse an OSS URI, returning (bucket, path)"""
+        """Parse an Artifactory URI, returning (repo_name, repo_path)"""
         parsed = urllib.parse.urlparse(uri)
         if parsed.scheme != "artifactory":
             raise Exception("Not an artifactory URI: %s" % uri)
@@ -79,7 +78,10 @@ class JfrogArtifactoryRepository(ArtifactRepository):
     
     def log_artifact(self, local_file, artifact_path=None):
         path = ArtifactoryPath(
-            self.jfrog_endpoint_url + artifact_path,
+            self.jfrog_endpoint_url + '/'
+            + self.repo_name + '/'
+            + self.repo_path + '/'
+            + artifact_path,
             **self.auth
         )
         
@@ -90,18 +92,24 @@ class JfrogArtifactoryRepository(ArtifactRepository):
 
     
     def log_artifacts(self, local_dir, artifact_path=None):
-        pass
+        raise MlflowException('Not implemented yet')
     
     def list_artifacts(self, path=None):
         if not path:
             path = ArtifactoryPath(
-                self.jfrog_endpoint_url,
+                self.jfrog_endpoint_url + '/' + self.repo_name + '/' + self.repo_path,
+                **self.auth
+            )
+        else:
+            rname, rpath = self.parse_artifactory_uri(path)
+            path = ArtifactoryPath(
+                    self.jfrog_endpoint_url + '/' + rname + '/' + rpath,
                 **self.auth
             )
         return [p for p in path]
     
     def _download_file(self, remote_file_path, local_path):
-        pass
+        raise MlflowException('Not implemented yet')
     
     def delete_artifacts(self, artifact_path=None):
         raise MlflowException('Not implemented yet')
