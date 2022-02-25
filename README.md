@@ -29,3 +29,7 @@ mlflow.set_experiment(exp_name)
 mlflow.log_artifact(artifact_path='python_files', #folder inside experiment
                     local_path='file.txt')
 ```
+
+## Credits
+
+This repo is highly based on: https://github.com/SeaOfOcean/mlflow-aliyunstore
