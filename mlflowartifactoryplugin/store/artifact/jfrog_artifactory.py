@@ -1,10 +1,14 @@
 
+import posixpath
 from mlflow.store.artifact.artifact_repo import ArtifactRepository
 from artifactory import ArtifactoryPath
 from mlflow.exceptions import MlflowException
+from mlflow.utils.file_utils import relative_path_to_artifact_path
 import os
 import urllib
 import logging
+from mlflow.entities import FileInfo
+import sys
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +28,6 @@ class JfrogArtifactoryRepository(ArtifactRepository):
         self.jfrog_endpoint_url = os.environ.get("JFROG_ENDPOINT_URL")
         assert self.jfrog_endpoint_url, 'Please set JFROG_ENDPOINT_URL'
         
-        self.repo_name, self.repo_path = self.parse_artifactory_uri(artifact_uri)
         self.auth: dict = self._auth()
         
         
@@ -77,14 +80,17 @@ class JfrogArtifactoryRepository(ArtifactRepository):
         return parsed.netloc, path
     
     def log_artifact(self, local_file, artifact_path=None):
+        rname, dest_path = self.parse_artifactory_uri(self.artifact_uri)
+        
+        if artifact_path:
+            dest_path = posixpath.join(rname, dest_path, artifact_path)
+        else:
+            dest_path = posixpath.join(rname, dest_path)
         path = ArtifactoryPath(
             self.jfrog_endpoint_url + '/'
-            + self.repo_name + '/'
-            + self.repo_path + '/'
-            + artifact_path,
+            + dest_path,
             **self.auth
         )
-        
         if not path.exists():
             path.mkdir()
         
@@ -92,24 +98,60 @@ class JfrogArtifactoryRepository(ArtifactRepository):
 
     
     def log_artifacts(self, local_dir, artifact_path=None):
-        raise MlflowException('Not implemented yet')
+        rname, dest_path = self.parse_artifactory_uri(self.artifact_uri)
+        if artifact_path:
+            dest_path = posixpath.join(rname, dest_path, artifact_path)
+        local_dir = os.path.abspath(local_dir)
+        for (root, _, filenames) in os.walk(local_dir):
+            upload_path = dest_path
+            if root != local_dir:
+                rel_path = os.path.relpath(root, local_dir)
+                rel_path = relative_path_to_artifact_path(rel_path)
+                upload_path = posixpath.join(dest_path, rel_path)
+                
+            for f in filenames:
+                dest, local =  posixpath.join(upload_path, f), os.path.join(root, f)
+                path = ArtifactoryPath( 
+                self.jfrog_endpoint_url + '/'
+                + dest,
+                **self.auth,
+                )
+                path.deploy_file(local)
+        
     
     def list_artifacts(self, path=None):
-        if not path:
-            path = ArtifactoryPath(
-                self.jfrog_endpoint_url + '/' + self.repo_name + '/' + self.repo_path,
-                **self.auth
-            )
+        rname, dest_path = self.parse_artifactory_uri(self.artifact_uri)
+        if path:
+            dest_path = posixpath.join(rname, dest_path, path)
         else:
-            rname, rpath = self.parse_artifactory_uri(path)
-            path = ArtifactoryPath(
-                    self.jfrog_endpoint_url + '/' + rname + '/' + rpath,
-                **self.auth
-            )
-        return [p for p in path]
+            dest_path = posixpath.join(rname, dest_path)
+            
+        _path = ArtifactoryPath( 
+                self.jfrog_endpoint_url + '/'
+                + dest_path,
+                **self.auth,
+                )
+        
+        results = [FileInfo(p.as_posix(),
+                            p.is_dir(),
+                            sys.getsizeof(p.read_bytes()))
+                            for p in _path.glob("**/*")]
+        
+        return results
     
     def _download_file(self, remote_file_path, local_path):
-        raise MlflowException('Not implemented yet')
+        rname, dest_path = self.parse_artifactory_uri(self.artifact_uri)
+        dest_path = posixpath.join(rname, dest_path, remote_file_path)
+        _path = ArtifactoryPath( 
+                self.jfrog_endpoint_url + '/'
+                + dest_path,
+                **self.auth,
+                )
+
+        with _path.open() as fd:
+            with open(local_path, "wb") as out:
+                out.write(fd.read())
+ 
     
     def delete_artifacts(self, artifact_path=None):
         raise MlflowException('Not implemented yet')

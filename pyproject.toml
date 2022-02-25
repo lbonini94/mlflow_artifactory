@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "mlflowartifactoryplugin"
-version = "0.0.5"
+version = "0.0.1"
 description = ""
 authors = ["Lucas A. Bonini <lucasamorimbonini@gmail.com>"]
 
