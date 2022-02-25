@@ -5,6 +5,8 @@ Send artifacts into JFrog Generic Repository
 ## Setup
 
 Expects environment variables below:  
+`JFROG_ENDPOINT_URL` like `"http://<IP>:<PORT>/artifactory/<REPO>`  
+Credentials:  
 `JFROG_ARTIFACTORY_TOKEN` or  
 `JFROG_ARTIFACTORY_APIKEY` or  
 `JFROG_ARTIFACTORY_USERNAME` and `JFROG_ARTIFACTORY_PASSWORD`  
